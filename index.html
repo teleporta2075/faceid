@@ -20,7 +20,7 @@ h1{
   margin-bottom: 5px;
 }
 
-#footer{
+#company{
   font-size: 18px;
   color: #666;
   margin-bottom: 30px;
@@ -58,7 +58,7 @@ button{
 
 <h1>Face ID</h1>
 
-<div id="footer">
+<div id="company">
 КазЭкспоМонтаж
 </div>
 
@@ -108,6 +108,12 @@ cursor:pointer;
 </div>
 
 <script>
+
+var trackingTimer = null;
+var currentEmployee = null;
+
+var SERVER_URL =
+  "https://problem-squeamish-unlawful.ngrok-free.dev";
 
 function showPhotoName(){
 
@@ -160,7 +166,7 @@ async function uploadPhoto(action){
 
     var response =
       await fetch(
-        "https://problem-squeamish-unlawful.ngrok-free.dev/recognize",
+        SERVER_URL + "/recognize",
         {
           method: "POST",
           body: formData
@@ -173,6 +179,24 @@ async function uploadPhoto(action){
     status.innerHTML =
       data.message;
 
+    if(data.success === true){
+
+      currentEmployee =
+        data.employee;
+
+      if(action === "start"){
+
+        startGpsTracking();
+
+      }
+
+      if(action === "end"){
+
+        stopGpsTracking();
+
+      }
+    }
+
   }
 
   catch(e){
@@ -181,6 +205,87 @@ async function uploadPhoto(action){
       "Ошибка соединения";
 
   }
+}
+
+function startGpsTracking(){
+
+  if(!navigator.geolocation){
+
+    document.getElementById("status").innerHTML =
+      "GPS не поддерживается";
+
+    return;
+  }
+
+  sendGpsPoint("gps_start");
+
+  if(trackingTimer !== null){
+
+    clearInterval(trackingTimer);
+
+  }
+
+  trackingTimer =
+    setInterval(function(){
+
+      sendGpsPoint("gps_track");
+
+    }, 30000);
+}
+
+function stopGpsTracking(){
+
+  sendGpsPoint("gps_end");
+
+  if(trackingTimer !== null){
+
+    clearInterval(trackingTimer);
+
+    trackingTimer = null;
+
+  }
+}
+
+function sendGpsPoint(action){
+
+  navigator.geolocation.getCurrentPosition(
+
+    async function(position){
+
+      var gpsData = {
+        employee: currentEmployee,
+        action: action,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      };
+
+      await fetch(
+        SERVER_URL + "/gps",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(gpsData)
+        }
+      );
+
+    },
+
+    function(error){
+
+      document.getElementById("status").innerHTML =
+        "GPS не разрешен";
+
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
 }
 
 </script>
